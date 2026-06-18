@@ -10,7 +10,9 @@ import {
   SquareDashed,
   Trash2,
   Type,
-  Undo2
+  Undo2,
+  ZoomIn,
+  ZoomOut
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Tool } from "../editor/types";
@@ -29,7 +31,11 @@ const tools: Array<{ tool: Tool; label: string; icon: ReactNode }> = [
 export function Toolbar({
   activeTool,
   canEdit,
+  zoom,
   onTool,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
   onUndo,
   onRedo,
   onDuplicate,
@@ -37,7 +43,11 @@ export function Toolbar({
 }: {
   activeTool: Tool;
   canEdit: boolean;
+  zoom: number;
   onTool: (tool: Tool) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDuplicate: () => void;
@@ -63,6 +73,21 @@ export function Toolbar({
       </button>
       <button aria-label="重做" title="重做" type="button" onClick={onRedo}>
         <Redo2 size={16} />
+      </button>
+      <button aria-label="縮小" title="縮小" type="button" onClick={onZoomOut}>
+        <ZoomOut size={16} />
+      </button>
+      <button
+        aria-label="重設縮放"
+        className="zoom-value"
+        title="重設縮放"
+        type="button"
+        onClick={onZoomReset}
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+      <button aria-label="放大" title="放大" type="button" onClick={onZoomIn}>
+        <ZoomIn size={16} />
       </button>
       <button
         aria-label="複製"

@@ -23,7 +23,22 @@ vi.mock("./render/exportPng", () => ({
 }));
 
 vi.mock("./word/wordClient", () => ({
-  insertImageAtSelection: vi.fn(async () => undefined)
+  cleanupEditableWordImage: vi.fn(async () => undefined),
+  insertImageAtSelection: vi.fn(async () => undefined),
+  loadSelectedImageForEditing: vi.fn(async () => ({
+    image: {
+      src: "data:image/png;base64,word-selected",
+      name: "Word 選取圖片",
+      width: 640,
+      height: 480
+    },
+    targetDisplaySize: {
+      width: 320,
+      height: 240
+    },
+    targetTag: "word-pic-editor-test"
+  })),
+  replaceEditableWordImage: vi.fn(async () => undefined)
 }));
 
 describe("App workflow", () => {
@@ -59,6 +74,110 @@ describe("App workflow", () => {
     await waitFor(() => {
       expect(screen.getByText("已插入 Word。")).toBeInTheDocument();
     });
+  });
+
+  it("loads a selected Word image and replaces it after annotation", async () => {
+    const user = userEvent.setup();
+    const wordClient = await import("./word/wordClient");
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "編輯選取圖片" }));
+
+    expect(await screen.findByText("Word 選取圖片")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "取代圖片" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "方框" }));
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const addEvent = createEvent.pointerDown(canvas);
+    Object.defineProperty(addEvent, "clientX", { value: 20 });
+    Object.defineProperty(addEvent, "clientY", { value: 30 });
+    fireEvent(canvas, addEvent);
+
+    await user.click(screen.getByRole("button", { name: "取代圖片" }));
+
+    await waitFor(() => {
+      expect(wordClient.replaceEditableWordImage).toHaveBeenCalledWith({
+        dataUrl: "data:image/png;base64,exported",
+        targetDisplaySize: {
+          width: 320,
+          height: 240
+        },
+        targetTag: "word-pic-editor-test"
+      });
+    });
+    expect(screen.getByText("已取代 Word 圖片。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "插入 Word" })).toBeEnabled();
+  });
+
+  it("cleans up the Word edit target when switching back to upload mode", async () => {
+    const user = userEvent.setup();
+    const wordClient = await import("./word/wordClient");
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "編輯選取圖片" }));
+    expect(await screen.findByText("Word 選取圖片")).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText("上傳圖片"),
+      new File(["image"], "manual.png", { type: "image/png" })
+    );
+
+    await waitFor(() => {
+      expect(wordClient.cleanupEditableWordImage).toHaveBeenCalledWith(
+        "word-pic-editor-test"
+      );
+    });
+    expect(await screen.findByText("manual.png")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "插入 Word" })).toBeEnabled();
+  });
+
+  it("clears existing annotations when reloading the selected Word image", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "編輯選取圖片" }));
+    expect(await screen.findByText("Word 選取圖片")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "方框" }));
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const addEvent = createEvent.pointerDown(canvas);
+    Object.defineProperty(addEvent, "clientX", { value: 20 });
+    Object.defineProperty(addEvent, "clientY", { value: 30 });
+    fireEvent(canvas, addEvent);
+    expect(screen.getByLabelText("寬")).toHaveValue(120);
+
+    await user.click(screen.getByRole("button", { name: "編輯選取圖片" }));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("寬")).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "取代圖片" })).toBeEnabled();
   });
 
   it("resizes a rectangle by dragging its canvas handle", async () => {
@@ -226,6 +345,130 @@ describe("App workflow", () => {
 
     expect(screen.getByLabelText("寬")).toHaveValue(120);
     expect(screen.getByLabelText("高")).toHaveValue(72);
+  });
+
+  it("creates smaller image-space annotations when zoomed in", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(
+      screen.getByLabelText("上傳圖片"),
+      new File(["image"], "assembly.png", { type: "image/png" })
+    );
+
+    await user.click(screen.getByRole("button", { name: "放大" }));
+    expect(screen.getByRole("button", { name: "重設縮放" })).toHaveTextContent(
+      "125%"
+    );
+
+    await user.click(screen.getByRole("button", { name: "方框" }));
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const moveEvent = createEvent.pointerMove(canvas);
+    Object.defineProperty(moveEvent, "clientX", { value: 320 });
+    Object.defineProperty(moveEvent, "clientY", { value: 240 });
+    fireEvent(canvas, moveEvent);
+
+    const preview = document.querySelector(".tool-preview");
+    expect(preview).toHaveAttribute("width", "96");
+    expect(preview).toHaveAttribute("height", "57.6");
+
+    const addEvent = createEvent.pointerDown(canvas);
+    Object.defineProperty(addEvent, "clientX", { value: 320 });
+    Object.defineProperty(addEvent, "clientY", { value: 240 });
+    fireEvent(canvas, addEvent);
+
+    expect(screen.getByLabelText("寬")).toHaveValue(96);
+    expect(screen.getByLabelText("高")).toHaveValue(58);
+  });
+
+  it("zooms with ctrl plus mouse wheel", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(
+      screen.getByLabelText("上傳圖片"),
+      new File(["image"], "assembly.png", { type: "image/png" })
+    );
+
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const wheelEvent = createEvent.wheel(canvas);
+    Object.defineProperty(wheelEvent, "ctrlKey", { value: true });
+    Object.defineProperty(wheelEvent, "deltaY", { value: -100 });
+    Object.defineProperty(wheelEvent, "clientX", { value: 320 });
+    Object.defineProperty(wheelEvent, "clientY", { value: 240 });
+    fireEvent(canvas, wheelEvent);
+
+    expect(screen.getByRole("button", { name: "重設縮放" })).toHaveTextContent(
+      "115%"
+    );
+  });
+
+  it("pans the zoomed image by dragging the image body", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(
+      screen.getByLabelText("上傳圖片"),
+      new File(["image"], "assembly.png", { type: "image/png" })
+    );
+
+    await user.click(screen.getByRole("button", { name: "放大" }));
+
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    expect(canvas).toHaveAttribute("viewBox", "64 48 512 384");
+
+    const image = document.querySelector("svg image");
+    expect(image).toBeInTheDocument();
+    const downEvent = createEvent.pointerDown(image as Element);
+    Object.defineProperty(downEvent, "clientX", { value: 320 });
+    Object.defineProperty(downEvent, "clientY", { value: 240 });
+    fireEvent(image as Element, downEvent);
+
+    const moveEvent = createEvent.pointerMove(canvas);
+    Object.defineProperty(moveEvent, "clientX", { value: 420 });
+    Object.defineProperty(moveEvent, "clientY", { value: 240 });
+    fireEvent(canvas, moveEvent);
+
+    expect(canvas.getAttribute("viewBox")).not.toBe("64 48 512 384");
   });
 
   it("allows thick annotation strokes up to 96", async () => {

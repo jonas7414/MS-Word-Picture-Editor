@@ -26,6 +26,18 @@
 4. Open the `圖片標註` task pane from the Home ribbon.
 5. Upload an image, add a text label and arrow, then click `插入 Word`.
 
+## Edit an existing Word image
+
+Word add-in context menus currently support selected text and Excel cells, but not a dedicated image right-click menu. For existing Word images, use this supported workflow:
+
+1. Select an inline picture in Word.
+2. Open the `圖片標註` task pane from the Home ribbon if it is not already open.
+3. Click `編輯選取圖片`.
+4. Add annotations in the task pane.
+5. Click `取代圖片`.
+
+The add-in wraps the selected picture with a temporary content-control tag when importing it, then uses that tag to replace the original picture with the flattened annotated PNG.
+
 ## Manual acceptance checklist
 
 - The task pane opens on the right side of Word.
@@ -36,4 +48,6 @@
 - Delete removes the selected annotation.
 - Undo restores the deleted annotation.
 - `插入 Word` inserts one flattened PNG at the current Word selection.
+- `編輯選取圖片` loads the selected inline picture from Word.
+- In edit mode, `取代圖片` replaces the imported Word picture instead of inserting a new image.
 - Inserted labels remain readable after resizing the image in Word.

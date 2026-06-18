@@ -65,7 +65,16 @@ export function editorReducer(
 ): EditorState {
   switch (action.type) {
     case "image/set":
-      return { ...state, image: action.image, selectedId: null };
+      return {
+        ...state,
+        image: action.image,
+        annotations: [],
+        selectedId: null,
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        past: [],
+        future: []
+      };
     case "image/clear":
       return { ...initialEditorState };
     case "tool/set":
@@ -143,6 +152,14 @@ export function editorReducer(
       return { ...state, zoom: Math.min(4, Math.max(0.25, action.zoom)) };
     case "viewport/set-pan":
       return { ...state, pan: action.pan };
+    case "viewport/pan-by":
+      return {
+        ...state,
+        pan: {
+          x: state.pan.x + action.delta.x,
+          y: state.pan.y + action.delta.y
+        }
+      };
     case "history/undo": {
       const previous = state.past.at(-1);
       if (!previous) return state;

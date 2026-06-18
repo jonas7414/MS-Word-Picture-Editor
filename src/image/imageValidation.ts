@@ -46,7 +46,9 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function readImageDimensions(src: string): Promise<{ width: number; height: number }> {
+export function readImageDimensions(
+  src: string
+): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () =>

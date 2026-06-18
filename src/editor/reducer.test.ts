@@ -20,6 +20,34 @@ describe("editorReducer", () => {
     });
   });
 
+  it("clears annotations and history when setting a new image", () => {
+    const annotation = createAnnotation("text", { x: 40, y: 60 });
+    const edited = editorReducer(
+      editorReducer(initialEditorState, {
+        type: "annotation/add",
+        annotation
+      }),
+      { type: "viewport/set-zoom", zoom: 2 }
+    );
+
+    const state = editorReducer(edited, {
+      type: "image/set",
+      image: {
+        src: "data:image/png;base64,next",
+        name: "next.png",
+        width: 640,
+        height: 480
+      }
+    });
+
+    expect(state.annotations).toEqual([]);
+    expect(state.selectedId).toBeNull();
+    expect(state.past).toEqual([]);
+    expect(state.future).toEqual([]);
+    expect(state.zoom).toBe(1);
+    expect(state.pan).toEqual({ x: 0, y: 0 });
+  });
+
   it("updates a selected annotation style", () => {
     const annotation = createAnnotation("rectangle", { x: 10, y: 20 });
     const added = editorReducer(initialEditorState, {
@@ -95,5 +123,18 @@ describe("editorReducer", () => {
       width: 96,
       height: 96
     });
+  });
+
+  it("accumulates viewport pan deltas from the latest reducer state", () => {
+    const pannedOnce = editorReducer(initialEditorState, {
+      type: "viewport/pan-by",
+      delta: { x: 10, y: 20 }
+    });
+    const pannedTwice = editorReducer(pannedOnce, {
+      type: "viewport/pan-by",
+      delta: { x: 5, y: -4 }
+    });
+
+    expect(pannedTwice.pan).toEqual({ x: 15, y: 16 });
   });
 });

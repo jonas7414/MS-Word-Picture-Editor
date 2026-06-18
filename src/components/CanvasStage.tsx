@@ -1,4 +1,4 @@
-import type { PointerEvent } from "react";
+import type { PointerEvent, WheelEvent } from "react";
 import { useRef, useState } from "react";
 import {
   defaultCalloutTargetOffset,
@@ -19,8 +19,12 @@ export function CanvasStage({
   image,
   annotations,
   activeTool,
+  zoom,
+  pan,
   selectedId,
   onAddAt,
+  onPan,
+  onZoom,
   onMove,
   onSelect,
   onUpdate
@@ -28,8 +32,12 @@ export function CanvasStage({
   image: LoadedImage | null;
   annotations: Annotation[];
   activeTool: Tool;
+  zoom: number;
+  pan: { x: number; y: number };
   selectedId: string | null;
   onAddAt: (x: number, y: number) => void;
+  onPan: (delta: { x: number; y: number }) => void;
+  onZoom: (zoom: number, anchor: { x: number; y: number }) => void;
   onSelect: (id: string | null) => void;
   onUpdate: (id: string, patch: Partial<Annotation>) => void;
   onMove: (id: string, delta: { x: number; y: number }) => void;
@@ -39,9 +47,10 @@ export function CanvasStage({
     null
   );
   const [dragging, setDragging] = useState<{
-    id: string;
-    mode: "move" | "resize";
+    id?: string;
+    mode: "move" | "resize" | "pan";
     handle?: ResizeHandle;
+    lastClient?: { x: number; y: number };
     lastPoint: { x: number; y: number };
   } | null>(null);
 
@@ -58,26 +67,46 @@ export function CanvasStage({
 
     const point = toImagePoint(event);
 
+    if (activeTool === "select" && isCanvasBackgroundTarget(event.target)) {
+      setPreviewPoint(null);
+      onSelect(null);
+      setDragging({
+        mode: "pan",
+        lastClient: { x: event.clientX, y: event.clientY },
+        lastPoint: point
+      });
+      return;
+    }
+
     setPreviewPoint(null);
     onSelect(null);
     onAddAt(point.x, point.y);
   }
 
   function toImagePoint(event: PointerEvent<SVGElement>) {
+    return clientPointToImagePoint(event.clientX, event.clientY, event.currentTarget);
+  }
+
+  function clientPointToImagePoint(
+    clientXValue: number,
+    clientYValue: number,
+    fallbackTarget: Element
+  ) {
     if (!image) return { x: 0, y: 0 };
 
-    const rect = (canvasRef.current ?? event.currentTarget).getBoundingClientRect();
+    const viewBox = getViewBox();
+    const rect = (canvasRef.current ?? fallbackTarget).getBoundingClientRect();
     const width = rect.width || image.width;
     const height = rect.height || image.height;
-    const scale = Math.min(width / image.width, height / image.height) || 1;
-    const renderedWidth = image.width * scale;
-    const renderedHeight = image.height * scale;
+    const scale = Math.min(width / viewBox.width, height / viewBox.height) || 1;
+    const renderedWidth = viewBox.width * scale;
+    const renderedHeight = viewBox.height * scale;
     const offsetX = (width - renderedWidth) / 2;
     const offsetY = (height - renderedHeight) / 2;
-    const clientX = Number.isFinite(event.clientX) ? event.clientX : rect.left;
-    const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top;
-    const imageX = (clientX - rect.left - offsetX) / scale;
-    const imageY = (clientY - rect.top - offsetY) / scale;
+    const clientX = Number.isFinite(clientXValue) ? clientXValue : rect.left;
+    const clientY = Number.isFinite(clientYValue) ? clientYValue : rect.top;
+    const imageX = viewBox.x + (clientX - rect.left - offsetX) / scale;
+    const imageY = viewBox.y + (clientY - rect.top - offsetY) / scale;
 
     return {
       x: Math.round(clamp(imageX, 0, image.width)),
@@ -100,6 +129,25 @@ export function CanvasStage({
     }
 
     const annotation = annotations.find((item) => item.id === dragging.id);
+
+    if (dragging.mode === "pan") {
+      const lastClient = dragging.lastClient ?? {
+        x: event.clientX,
+        y: event.clientY
+      };
+      const imageDelta = clientDeltaToImageDelta({
+        x: event.clientX - lastClient.x,
+        y: event.clientY - lastClient.y
+      });
+      onPan({ x: -imageDelta.x, y: -imageDelta.y });
+      setDragging({
+        ...dragging,
+        lastClient: { x: event.clientX, y: event.clientY },
+        lastPoint: point
+      });
+      return;
+    }
+
     if (!annotation) return;
 
     if (dragging.mode === "move") {
@@ -141,11 +189,63 @@ export function CanvasStage({
     }
   }
 
+  function handleWheel(event: WheelEvent<SVGSVGElement>) {
+    if (!image || !event.ctrlKey) return;
+
+    event.preventDefault();
+    const anchor = clientPointToImagePoint(
+      event.clientX,
+      event.clientY,
+      event.currentTarget
+    );
+    const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+    onZoom(zoom * zoomFactor, anchor);
+  }
+
+  function clientDeltaToImageDelta(delta: { x: number; y: number }) {
+    if (!image) return { x: 0, y: 0 };
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const viewBox = getViewBox();
+    const width = rect?.width || image.width;
+    const height = rect?.height || image.height;
+    const scale = Math.min(width / viewBox.width, height / viewBox.height) || 1;
+
+    return {
+      x: delta.x / scale,
+      y: delta.y / scale
+    };
+  }
+
+  function isCanvasBackgroundTarget(target: EventTarget) {
+    return (
+      target === canvasRef.current ||
+      (target instanceof Element &&
+        target.tagName.toLowerCase() === "image" &&
+        target.parentElement === canvasRef.current)
+    );
+  }
+
   function handleResizeStart(id: string, handle: ResizeHandle) {
     setPreviewPoint(null);
     onSelect(id);
     setDragging({ id, mode: "resize", handle, lastPoint: { x: 0, y: 0 } });
   }
+
+  function getViewBox() {
+    if (!image) return { x: 0, y: 0, width: 1, height: 1 };
+
+    const viewWidth = image.width / zoom;
+    const viewHeight = image.height / zoom;
+    return {
+      x: clamp(pan.x, 0, Math.max(0, image.width - viewWidth)),
+      y: clamp(pan.y, 0, Math.max(0, image.height - viewHeight)),
+      width: viewWidth,
+      height: viewHeight
+    };
+  }
+
+  const viewBox = getViewBox();
 
   function handleMoveStart(
     id: string,
@@ -167,11 +267,12 @@ export function CanvasStage({
         aria-label="圖片標註畫布"
         className={`canvas-stage tool-cursor-${activeTool}`}
         ref={canvasRef}
-        viewBox={`0 0 ${image.width} ${image.height}`}
+        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={() => setDragging(null)}
         onPointerLeave={() => setDragging(null)}
+        onWheel={handleWheel}
       >
         <image height={image.height} href={image.src} width={image.width} />
         <AnnotationSvg
@@ -181,7 +282,7 @@ export function CanvasStage({
           onMoveStart={handleMoveStart}
           onResizeStart={handleResizeStart}
         />
-        <ToolPreview activeTool={activeTool} point={previewPoint} />
+        <ToolPreview activeTool={activeTool} point={previewPoint} zoom={zoom} />
       </svg>
     </section>
   );
@@ -189,19 +290,22 @@ export function CanvasStage({
 
 function ToolPreview({
   activeTool,
-  point
+  point,
+  zoom
 }: {
   activeTool: Tool;
   point: { x: number; y: number } | null;
+  zoom: number;
 }) {
   if (!point || activeTool === "select") return null;
+  const scale = 1 / zoom;
 
   const common = {
     fill: defaultFill,
     opacity: 0.72,
     pointerEvents: "none" as const,
     stroke: defaultStroke,
-    strokeWidth: defaultStrokeWidth
+    strokeWidth: Math.max(1, defaultStrokeWidth * scale)
   };
 
   if (activeTool === "text") {
@@ -210,19 +314,19 @@ function ToolPreview({
       <g aria-hidden="true" className="tool-preview" pointerEvents="none">
         <rect
           fill={defaultTextBackground}
-          height={defaultFontSize + 10}
+          height={(defaultFontSize + 10) * scale}
           opacity="0.72"
           rx="3"
           stroke={defaultStroke}
-          strokeWidth={defaultStrokeWidth}
-          width={text.length * defaultFontSize}
-          x={point.x - 4}
-          y={point.y - defaultFontSize}
+          strokeWidth={Math.max(1, defaultStrokeWidth * scale)}
+          width={text.length * defaultFontSize * scale}
+          x={point.x - 4 * scale}
+          y={point.y - defaultFontSize * scale}
         />
         <text
           dominantBaseline="alphabetic"
           fill={defaultTextColor}
-          fontSize={defaultFontSize}
+          fontSize={Math.max(6, defaultFontSize * scale)}
           opacity="0.72"
           x={point.x}
           y={point.y}
@@ -242,7 +346,7 @@ function ToolPreview({
         markerEnd={activeTool === "arrow" ? "url(#arrow-head)" : undefined}
         strokeLinecap="round"
         x1={point.x}
-        x2={point.x + defaultLineLength}
+        x2={point.x + defaultLineLength * scale}
         y1={point.y}
         y2={point.y}
       />
@@ -258,25 +362,25 @@ function ToolPreview({
           markerEnd="url(#arrow-head)"
           strokeLinecap="round"
           x1={point.x}
-          x2={point.x + defaultCalloutTargetOffset.x}
+          x2={point.x + defaultCalloutTargetOffset.x * scale}
           y1={point.y}
-          y2={point.y + defaultCalloutTargetOffset.y}
+          y2={point.y + defaultCalloutTargetOffset.y * scale}
         />
         <rect
           fill={defaultTextBackground}
-          height={defaultFontSize + 10}
+          height={(defaultFontSize + 10) * scale}
           opacity="0.72"
           rx="3"
           stroke={defaultStroke}
-          strokeWidth={defaultStrokeWidth}
-          width={text.length * defaultFontSize}
-          x={point.x - 4}
-          y={point.y - defaultFontSize}
+          strokeWidth={Math.max(1, defaultStrokeWidth * scale)}
+          width={text.length * defaultFontSize * scale}
+          x={point.x - 4 * scale}
+          y={point.y - defaultFontSize * scale}
         />
         <text
           dominantBaseline="alphabetic"
           fill={defaultTextColor}
-          fontSize={defaultFontSize}
+          fontSize={Math.max(6, defaultFontSize * scale)}
           opacity="0.72"
           x={point.x}
           y={point.y}
@@ -293,10 +397,10 @@ function ToolPreview({
         {...common}
         aria-hidden="true"
         className="tool-preview"
-        cx={point.x + defaultCircleSize.width / 2}
-        cy={point.y + defaultCircleSize.height / 2}
-        rx={defaultCircleSize.width / 2}
-        ry={defaultCircleSize.height / 2}
+        cx={point.x + (defaultCircleSize.width * scale) / 2}
+        cy={point.y + (defaultCircleSize.height * scale) / 2}
+        rx={(defaultCircleSize.width * scale) / 2}
+        ry={(defaultCircleSize.height * scale) / 2}
       />
     );
   }
@@ -306,9 +410,9 @@ function ToolPreview({
       {...common}
       aria-hidden="true"
       className="tool-preview"
-      height={defaultRectangleSize.height}
+      height={defaultRectangleSize.height * scale}
       strokeDasharray={activeTool === "dashedRectangle" ? "10 7" : undefined}
-      width={defaultRectangleSize.width}
+      width={defaultRectangleSize.width * scale}
       x={point.x}
       y={point.y}
     />

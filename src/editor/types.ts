@@ -98,5 +98,6 @@ export type EditorAction =
   | { type: "annotations/clear" }
   | { type: "viewport/set-zoom"; zoom: number }
   | { type: "viewport/set-pan"; pan: Point }
+  | { type: "viewport/pan-by"; delta: Point }
   | { type: "history/undo" }
   | { type: "history/redo" };
