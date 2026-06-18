@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+  <Id>7f7e9f49-65df-4d52-9f4e-b5ad8f3f9d7a</Id>
+  <Version>0.1.0.0</Version>
+  <ProviderName>word-pic-editor</ProviderName>
+  <DefaultLocale>zh-TW</DefaultLocale>
+  <DisplayName DefaultValue="圖片標註" />
+  <Description DefaultValue="在 Word 中上傳圖片、加入工程標註並插入文件。" />
+  <IconUrl DefaultValue="https://localhost:3000/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/icon-64.png" />
+  <SupportUrl DefaultValue="https://localhost:3000" />
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/index.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
+          </GetStarted>
+          <FunctionFile resid="Commands.Url" />
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="AnnotationGroup">
+                <Label resid="AnnotationGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Control xsi:type="Button" id="OpenPaneButton">
+                  <Label resid="OpenPaneButton.Label" />
+                  <Supertip>
+                    <Title resid="OpenPaneButton.Label" />
+                    <Description resid="OpenPaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/index.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/index.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://localhost:3000" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="圖片標註已就緒" />
+        <bt:String id="AnnotationGroup.Label" DefaultValue="圖片標註" />
+        <bt:String id="OpenPaneButton.Label" DefaultValue="圖片標註" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="開啟右側面板，上傳圖片並加入工程標註。" />
+        <bt:String id="OpenPaneButton.Tooltip" DefaultValue="開啟圖片標註工具面板。" />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
