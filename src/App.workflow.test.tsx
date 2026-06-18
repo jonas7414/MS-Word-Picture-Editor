@@ -184,4 +184,40 @@ describe("App workflow", () => {
     expect(outline).toHaveAttribute("x", "316");
     expect(outline).toHaveAttribute("y", "236");
   });
+
+  it("allows thick annotation strokes up to 48", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(
+      screen.getByLabelText("上傳圖片"),
+      new File(["image"], "assembly.png", { type: "image/png" })
+    );
+
+    await user.click(screen.getByRole("button", { name: "方框" }));
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const addEvent = createEvent.pointerDown(canvas);
+    Object.defineProperty(addEvent, "clientX", { value: 20 });
+    Object.defineProperty(addEvent, "clientY", { value: 30 });
+    fireEvent(canvas, addEvent);
+
+    const strokeWidth = screen.getByLabelText("線寬");
+    expect(strokeWidth).toHaveAttribute("max", "48");
+    await user.clear(strokeWidth);
+    await user.type(strokeWidth, "48");
+    expect(strokeWidth).toHaveValue(48);
+  });
 });

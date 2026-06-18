@@ -151,7 +151,7 @@ export function PropertyPanel({
         線寬
         <input
           aria-label="線寬"
-          max="12"
+          max="48"
           min="1"
           type="number"
           value={annotation.strokeWidth}
