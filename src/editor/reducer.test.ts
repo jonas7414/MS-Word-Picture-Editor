@@ -86,4 +86,14 @@ describe("editorReducer", () => {
       height: 72
     });
   });
+
+  it("creates a circle with equal default width and height", () => {
+    const annotation = createAnnotation("ellipse", { x: 12, y: 24 });
+
+    expect(annotation).toMatchObject({
+      type: "ellipse",
+      width: 96,
+      height: 96
+    });
+  });
 });

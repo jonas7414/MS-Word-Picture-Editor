@@ -253,6 +253,35 @@ textarea {
   min-height: 100%;
 }
 
+.tool-cursor-select {
+  cursor: default;
+}
+
+.tool-cursor-text {
+  cursor: none;
+}
+
+.tool-cursor-line {
+  cursor: none;
+}
+
+.tool-cursor-arrow,
+.tool-cursor-callout {
+  cursor: none;
+}
+
+.tool-cursor-rectangle {
+  cursor: none;
+}
+
+.tool-cursor-dashedRectangle {
+  cursor: none;
+}
+
+.tool-cursor-ellipse {
+  cursor: none;
+}
+
 .floating-toolbar {
   position: absolute;
   top: 10px;

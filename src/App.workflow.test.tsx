@@ -72,6 +72,7 @@ describe("App workflow", () => {
 
     await user.click(screen.getByRole("button", { name: "方框" }));
     const canvas = screen.getByLabelText("圖片標註畫布");
+    expect(canvas).toHaveClass("tool-cursor-rectangle");
     canvas.getBoundingClientRect = () =>
       ({
         bottom: 480,
@@ -185,7 +186,49 @@ describe("App workflow", () => {
     expect(outline).toHaveAttribute("y", "236");
   });
 
-  it("allows thick annotation strokes up to 48", async () => {
+  it("shows a same-size preview before placing a shape", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(
+      screen.getByLabelText("上傳圖片"),
+      new File(["image"], "assembly.png", { type: "image/png" })
+    );
+
+    await user.click(screen.getByRole("button", { name: "方框" }));
+    const canvas = screen.getByLabelText("圖片標註畫布");
+    canvas.getBoundingClientRect = () =>
+      ({
+        bottom: 480,
+        height: 480,
+        left: 0,
+        right: 640,
+        top: 0,
+        width: 640,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const moveEvent = createEvent.pointerMove(canvas);
+    Object.defineProperty(moveEvent, "clientX", { value: 40 });
+    Object.defineProperty(moveEvent, "clientY", { value: 50 });
+    fireEvent(canvas, moveEvent);
+
+    const preview = document.querySelector(".tool-preview");
+    expect(preview).toHaveAttribute("width", "120");
+    expect(preview).toHaveAttribute("height", "72");
+
+    const addEvent = createEvent.pointerDown(canvas);
+    Object.defineProperty(addEvent, "clientX", { value: 40 });
+    Object.defineProperty(addEvent, "clientY", { value: 50 });
+    fireEvent(canvas, addEvent);
+
+    expect(screen.getByLabelText("寬")).toHaveValue(120);
+    expect(screen.getByLabelText("高")).toHaveValue(72);
+  });
+
+  it("allows thick annotation strokes up to 96", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -215,9 +258,9 @@ describe("App workflow", () => {
     fireEvent(canvas, addEvent);
 
     const strokeWidth = screen.getByLabelText("線寬");
-    expect(strokeWidth).toHaveAttribute("max", "48");
+    expect(strokeWidth).toHaveAttribute("max", "96");
     await user.clear(strokeWidth);
-    await user.type(strokeWidth, "48");
-    expect(strokeWidth).toHaveValue(48);
+    await user.type(strokeWidth, "96");
+    expect(strokeWidth).toHaveValue(96);
   });
 });

@@ -15,6 +15,10 @@ export const defaultTextBackground = "#ffffff";
 export const defaultStrokeWidth = 3;
 export const defaultFontSize = 18;
 export const defaultStrokeStyle = "solid" as const;
+export const defaultLineLength = 96;
+export const defaultCalloutTargetOffset = { x: 96, y: 40 };
+export const defaultRectangleSize = { width: 120, height: 72 };
+export const defaultCircleSize = { width: 96, height: 96 };
 
 let nextId = 1;
 
@@ -72,7 +76,7 @@ export function createAnnotation(
       type: tool,
       x1: point.x,
       y1: point.y,
-      x2: point.x + 96,
+      x2: point.x + defaultLineLength,
       y2: point.y
     };
   }
@@ -87,8 +91,8 @@ export function createAnnotation(
       fontSize: defaultFontSize,
       color: defaultTextColor,
       background: defaultTextBackground,
-      targetX: point.x + 96,
-      targetY: point.y + 40
+      targetX: point.x + defaultCalloutTargetOffset.x,
+      targetY: point.y + defaultCalloutTargetOffset.y
     };
   }
 
@@ -98,7 +102,9 @@ export function createAnnotation(
     strokeStyle: tool === "dashedRectangle" ? "dashed" : base.strokeStyle,
     x: point.x,
     y: point.y,
-    width: 120,
-    height: 72
+    width:
+      tool === "ellipse" ? defaultCircleSize.width : defaultRectangleSize.width,
+    height:
+      tool === "ellipse" ? defaultCircleSize.height : defaultRectangleSize.height
   };
 }

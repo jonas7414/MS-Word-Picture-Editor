@@ -1,11 +1,24 @@
 import type { PointerEvent } from "react";
 import { useRef, useState } from "react";
-import type { Annotation, LoadedImage } from "../editor/types";
+import {
+  defaultCalloutTargetOffset,
+  defaultCircleSize,
+  defaultFill,
+  defaultFontSize,
+  defaultLineLength,
+  defaultRectangleSize,
+  defaultStroke,
+  defaultStrokeWidth,
+  defaultTextBackground,
+  defaultTextColor
+} from "../editor/defaults";
+import type { Annotation, LoadedImage, Tool } from "../editor/types";
 import { AnnotationSvg, type ResizeHandle } from "../render/annotationSvg";
 
 export function CanvasStage({
   image,
   annotations,
+  activeTool,
   selectedId,
   onAddAt,
   onMove,
@@ -14,6 +27,7 @@ export function CanvasStage({
 }: {
   image: LoadedImage | null;
   annotations: Annotation[];
+  activeTool: Tool;
   selectedId: string | null;
   onAddAt: (x: number, y: number) => void;
   onSelect: (id: string | null) => void;
@@ -21,6 +35,9 @@ export function CanvasStage({
   onMove: (id: string, delta: { x: number; y: number }) => void;
 }) {
   const canvasRef = useRef<SVGSVGElement | null>(null);
+  const [previewPoint, setPreviewPoint] = useState<{ x: number; y: number } | null>(
+    null
+  );
   const [dragging, setDragging] = useState<{
     id: string;
     mode: "move" | "resize";
@@ -41,6 +58,7 @@ export function CanvasStage({
 
     const point = toImagePoint(event);
 
+    setPreviewPoint(null);
     onSelect(null);
     onAddAt(point.x, point.y);
   }
@@ -72,12 +90,17 @@ export function CanvasStage({
   }
 
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
-    if (!dragging || !image) return;
+    if (!image) return;
+
+    const point = toImagePoint(event);
+
+    if (!dragging) {
+      setPreviewPoint(activeTool === "select" ? null : point);
+      return;
+    }
 
     const annotation = annotations.find((item) => item.id === dragging.id);
     if (!annotation) return;
-
-    const point = toImagePoint(event);
 
     if (dragging.mode === "move") {
       onMove(annotation.id, {
@@ -119,6 +142,7 @@ export function CanvasStage({
   }
 
   function handleResizeStart(id: string, handle: ResizeHandle) {
+    setPreviewPoint(null);
     onSelect(id);
     setDragging({ id, mode: "resize", handle, lastPoint: { x: 0, y: 0 } });
   }
@@ -128,6 +152,7 @@ export function CanvasStage({
     event: PointerEvent<SVGElement>
   ) {
     const point = toImagePoint(event);
+    setPreviewPoint(null);
     onSelect(id);
     setDragging({
       id,
@@ -140,7 +165,7 @@ export function CanvasStage({
     <section className="canvas-wrap">
       <svg
         aria-label="圖片標註畫布"
-        className="canvas-stage"
+        className={`canvas-stage tool-cursor-${activeTool}`}
         ref={canvasRef}
         viewBox={`0 0 ${image.width} ${image.height}`}
         onPointerDown={handlePointerDown}
@@ -156,7 +181,136 @@ export function CanvasStage({
           onMoveStart={handleMoveStart}
           onResizeStart={handleResizeStart}
         />
+        <ToolPreview activeTool={activeTool} point={previewPoint} />
       </svg>
     </section>
+  );
+}
+
+function ToolPreview({
+  activeTool,
+  point
+}: {
+  activeTool: Tool;
+  point: { x: number; y: number } | null;
+}) {
+  if (!point || activeTool === "select") return null;
+
+  const common = {
+    fill: defaultFill,
+    opacity: 0.72,
+    pointerEvents: "none" as const,
+    stroke: defaultStroke,
+    strokeWidth: defaultStrokeWidth
+  };
+
+  if (activeTool === "text") {
+    const text = "零件名稱";
+    return (
+      <g aria-hidden="true" className="tool-preview" pointerEvents="none">
+        <rect
+          fill={defaultTextBackground}
+          height={defaultFontSize + 10}
+          opacity="0.72"
+          rx="3"
+          stroke={defaultStroke}
+          strokeWidth={defaultStrokeWidth}
+          width={text.length * defaultFontSize}
+          x={point.x - 4}
+          y={point.y - defaultFontSize}
+        />
+        <text
+          dominantBaseline="alphabetic"
+          fill={defaultTextColor}
+          fontSize={defaultFontSize}
+          opacity="0.72"
+          x={point.x}
+          y={point.y}
+        >
+          {text}
+        </text>
+      </g>
+    );
+  }
+
+  if (activeTool === "line" || activeTool === "arrow") {
+    return (
+      <line
+        {...common}
+        aria-hidden="true"
+        className="tool-preview"
+        markerEnd={activeTool === "arrow" ? "url(#arrow-head)" : undefined}
+        strokeLinecap="round"
+        x1={point.x}
+        x2={point.x + defaultLineLength}
+        y1={point.y}
+        y2={point.y}
+      />
+    );
+  }
+
+  if (activeTool === "callout") {
+    const text = "零件名稱";
+    return (
+      <g aria-hidden="true" className="tool-preview" pointerEvents="none">
+        <line
+          {...common}
+          markerEnd="url(#arrow-head)"
+          strokeLinecap="round"
+          x1={point.x}
+          x2={point.x + defaultCalloutTargetOffset.x}
+          y1={point.y}
+          y2={point.y + defaultCalloutTargetOffset.y}
+        />
+        <rect
+          fill={defaultTextBackground}
+          height={defaultFontSize + 10}
+          opacity="0.72"
+          rx="3"
+          stroke={defaultStroke}
+          strokeWidth={defaultStrokeWidth}
+          width={text.length * defaultFontSize}
+          x={point.x - 4}
+          y={point.y - defaultFontSize}
+        />
+        <text
+          dominantBaseline="alphabetic"
+          fill={defaultTextColor}
+          fontSize={defaultFontSize}
+          opacity="0.72"
+          x={point.x}
+          y={point.y}
+        >
+          {text}
+        </text>
+      </g>
+    );
+  }
+
+  if (activeTool === "ellipse") {
+    return (
+      <ellipse
+        {...common}
+        aria-hidden="true"
+        className="tool-preview"
+        cx={point.x + defaultCircleSize.width / 2}
+        cy={point.y + defaultCircleSize.height / 2}
+        rx={defaultCircleSize.width / 2}
+        ry={defaultCircleSize.height / 2}
+      />
+    );
+  }
+
+  return (
+    <rect
+      {...common}
+      aria-hidden="true"
+      className="tool-preview"
+      height={defaultRectangleSize.height}
+      strokeDasharray={activeTool === "dashedRectangle" ? "10 7" : undefined}
+      width={defaultRectangleSize.width}
+      x={point.x}
+      y={point.y}
+    />
   );
 }

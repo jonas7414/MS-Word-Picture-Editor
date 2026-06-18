@@ -53,6 +53,7 @@ export function App() {
       <section className="workspace" aria-label="圖片編輯工作區">
         <CanvasStage
           annotations={editor.state.annotations}
+          activeTool={editor.state.activeTool}
           image={editor.state.image}
           selectedId={editor.state.selectedId}
           onAddAt={editor.addAnnotationAt}
