@@ -125,26 +125,3 @@ npm run dev:https
 ```text
 public/manifest.xml
 ```
-
-## 發佈
-
-GitHub Pages 會在 push 到 `master` 後自動部署。
-
-要發新 GitHub Release，更新 `package.json` 的版本號，例如：
-
-```json
-"version": "0.1.1"
-```
-
-commit 並 push 後，Release workflow 會自動建立：
-
-```text
-v0.1.1
-```
-
-並附上：
-
-```text
-manifest.xml
-word-pic-editor-v0.1.1.zip
-```

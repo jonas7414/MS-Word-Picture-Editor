@@ -33,3 +33,6 @@ Thumbs.db
 # Local agent tooling
 .agents/
 skills-lock.json
+
+# Local documentation drafts
+docs/
