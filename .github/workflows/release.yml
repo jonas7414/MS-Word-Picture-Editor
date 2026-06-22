@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build GitHub Pages package
+        run: npm run build:pages
+        env:
+          GITHUB_PAGES_BASE: /${{ github.event.repository.name }}/
+          GITHUB_PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+      - name: Read package version
+        id: package
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check release existence
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.package.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package release assets
+        if: steps.release.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          cd dist
+          zip -r "../word-pic-editor-v${VERSION}.zip" .
+
+      - name: Create release
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.package.outputs.tag }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            "word-pic-editor-v${VERSION}.zip" \
+            "dist/manifest.xml" \
+            --target "${{ github.sha }}" \
+            --title "Word Picture Editor v${VERSION}" \
+            --notes "Automated release for Word Picture Editor v${VERSION}."
+
+      - name: Skip existing release
+        if: steps.release.outputs.exists == 'true'
+        run: echo "Release ${{ steps.package.outputs.tag }} already exists; skipping."
